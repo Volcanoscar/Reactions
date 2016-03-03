@@ -12,13 +12,20 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Created by chRyNaN on 2/26/2016.
+ * Created by chRyNaN on 2/26/2016. This ViewGroup displays the Reactions and handles interactions with them. This ViewGroup
+ * should most often be used within a ReactionPopup and given match_parent height and width attributes to properly draw the View.
  */
-public class ReactionView extends ViewGroup {
+public class ReactionView extends ViewGroup implements ReactionEvents {
     private static final String TAG = ReactionView.class.getSimpleName();
     //It seems the ReactionView in Facebook has a set size. If you switch to landscape mode the size stays the same, icons and all.
     //So, I should set these to hard coded values
@@ -42,6 +49,9 @@ public class ReactionView extends ViewGroup {
     private float yStart;
     private float cornerSize;
 
+    private float touchX, touchY;
+    private ViewConfiguration vc;
+
     private float availableWidth, availableHeight;
 
     private Path backgroundPath;
@@ -55,6 +65,9 @@ public class ReactionView extends ViewGroup {
     private IconView wow;
     private IconView sad;
     private IconView angry;
+
+    private List<ReactionSelectedListener> reactionListeners;
+    private List<VisibilityChangedListener> visibilityListeners;
 
     public ReactionView(Context context) {
         super(context);
@@ -78,31 +91,32 @@ public class ReactionView extends ViewGroup {
     }
 
     private void init(Context context, AttributeSet attrs){
-        //Set paint up to draw the background
+        //Initially the View is not visible until it is alerted to show at a specific position, sX and sY
+        //setVisibility(View.GONE);
+        visibilityListeners = new ArrayList<>();
+        reactionListeners = new ArrayList<>();
+        vc = ViewConfiguration.get(context);
         sX = 0f;
         sY = 0f;
-        backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        backgroundPaint.setColor(Color.parseColor("#FFFFFF"));
-        backgroundPaint.setStyle(Paint.Style.FILL);
-        backgroundPaint.setAlpha(230);
+        //backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        //backgroundPaint.setColor(Color.parseColor("#FFFFFF"));
+        //backgroundPaint.setStyle(Paint.Style.FILL);
+        //backgroundPaint.setAlpha(230);
         addIcons(context);
     }
 
     private void addIcons(Context context){
         background = new RoundedView(context);
-        like = new IconView(context, ReactionPopup.Reaction.LIKE);
-        love = new IconView(context, ReactionPopup.Reaction.LOVE);
-        laugh = new IconView(context, ReactionPopup.Reaction.LAUGH);
-        wow = new IconView(context, ReactionPopup.Reaction.WOW);
-        sad = new IconView(context, ReactionPopup.Reaction.SAD);
-        angry = new IconView(context, ReactionPopup.Reaction.ANGRY);
+        like = new IconView(context, Reaction.LIKE);
+        love = new IconView(context, Reaction.LOVE);
+        laugh = new IconView(context, Reaction.LAUGH);
+        wow = new IconView(context, Reaction.WOW);
+        sad = new IconView(context, Reaction.SAD);
+        angry = new IconView(context, Reaction.ANGRY);
         addView(background);
         addView(like);
-        Log.d(TAG, "addView called on like");
         addView(love);
-        Log.d(TAG, "addView called on love");
         addView(laugh);
-        Log.d(TAG, "addView called on laugh");
         addView(wow);
         addView(sad);
         addView(angry);
@@ -131,7 +145,7 @@ public class ReactionView extends ViewGroup {
 
         cornerSize = xPad + currentIconSize / 2;
         float centerX = ViewUtils.getCenterPosition(0, availableWidth);
-        xStart = (sX + vWidth >= (centerX - (vWidth / 2))) ? (centerX - (vWidth / 2) + cornerSize) : sX + cornerSize;
+        xStart = (sX + vWidth >= (centerX - (vWidth / 2))) ? (centerX - (vWidth / 2) + cornerSize) : sX + cornerSize + xPad;
         yStart = ((sY - (distance + vHeight)) < 0) ? (sY + distance) : (sY - (distance + vHeight));
 
         setPadding((int) xPad, (int) yPad, (int) xPad, (int) yPad);
@@ -190,10 +204,6 @@ public class ReactionView extends ViewGroup {
         Log.d(TAG, "onLayout: l = " + l + "; t = " + t + "; r = " + r + "; b = " + b);
         //If there are small icon sizes adjust the height of the background to them
         background.setPadding((int) xPad, (int) yPad, (int) xPad, (int) yPad);
-        if(getSmallestChildMode() == IconView.Mode.SMALL){
-            vHeight = (int) (smallIconSize + 2 * yPad);
-            yStart = yStart + (regIconSize - smallIconSize);
-        }
         final int count = getChildCount();
         //To animate the size changes
         AnimatorSet animSet = new AnimatorSet();
@@ -242,20 +252,201 @@ public class ReactionView extends ViewGroup {
             }else if(getChildAt(i) instanceof RoundedView){
                 final RoundedView child = (RoundedView) getChildAt(i);
                 Log.d(TAG, "onLayout: xStart = " + xStart + "; cornerSize = " + cornerSize);
-                ValueAnimator heightAnim = ValueAnimator.ofFloat(child.getY(), yStart);
+                final ValueAnimator heightAnim;
+                if(getSmallestChildMode() == IconView.Mode.SMALL){
+                    //vHeight = (int) (smallIconSize + 2 * yPad);
+                    //yStart = yStart + (regIconSize - smallIconSize);
+                    heightAnim = ValueAnimator.ofFloat(child.getY(), (yStart + (regIconSize - smallIconSize)));
+                }else {
+                    heightAnim = ValueAnimator.ofFloat(child.getY(), yStart);
+                }
                 heightAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     @Override
                     public void onAnimationUpdate(ValueAnimator animation) {
-                        child.layout(Math.round(xStart - cornerSize), Math.round(yStart),
-                                Math.round(xStart + vWidth - cornerSize), Math.round(yStart + vHeight));
+                        if(getSmallestChildMode() == IconView.Mode.SMALL){
+                            child.layout(Math.round(xStart - cornerSize), Math.round((float) heightAnim.getAnimatedValue()),
+                                    Math.round(xStart + vWidth - cornerSize),
+                                    Math.round(yStart + vHeight));
+                        }else {
+                            child.layout(Math.round(xStart - cornerSize), Math.round(yStart),
+                                    Math.round(xStart + vWidth - cornerSize), Math.round(yStart + vHeight));
+                        }
                     }
                 });
-                heightAnim.setDuration(250);
+                heightAnim.setDuration(100);
                 heightAnim.start();
             }
         }
         animSet.setDuration(100);
         animSet.start();
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent event){
+        switch(event.getAction()){
+            case MotionEvent.ACTION_CANCEL:
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_MOVE:
+            case MotionEvent.ACTION_UP:
+                return true;
+        }
+        return super.onTouchEvent(event);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event){
+        //TODO fix problem when selecting the first item
+        IconView view = null;
+        switch(event.getAction()){
+            case MotionEvent.ACTION_DOWN:
+                touchX = event.getX();
+                touchY = event.getY();
+                view = getClosestIcon(touchX, touchY);
+                Log.d(TAG, "onTouchEvent: x = " + touchX + " startX = " + xStart + "; y = " + touchY + "; startY = " + yStart);
+                if(view != null && !view.equals(getLargestChild())){
+                    Log.d(TAG, "onTouchEvent: action down view is not null");
+                    setChildToLarge(view);
+                    SoundManager.getInstance(getContext()).play(SoundManager.DOWN);
+                }else if(!inVerticalRange(touchY) || !inHorizontalRange(touchX)){
+                    onCancel();
+                    resetChildrenToNormalSize();
+                    dismiss();
+                    return false;
+                }
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                if(Math.abs(touchX - event.getX()) > vc.getScaledTouchSlop()){
+                    view = getClosestIcon(event.getX(), event.getY());
+                    if(view == null){
+                        resetChildrenToNormalSize();
+                    }else if (!view.equals(getLargestChild())){
+                        setChildToLarge(view);
+                        SoundManager.getInstance(getContext()).play(SoundManager.SELECT);
+                    }
+                }
+                return true;
+            case MotionEvent.ACTION_UP:
+                view = getClosestIcon(event.getX(), event.getY());
+                if(view != null){
+                    SoundManager.getInstance(getContext()).play(SoundManager.UP);
+                    handleSelectedIcon(view);
+                    dismiss();
+                }
+                if(getLargestChildMode() == IconView.Mode.LARGE){
+                    resetChildrenToNormalSize();
+                }
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                //Make sure all Views are at their regular size
+                resetChildrenToNormalSize();
+                SoundManager.getInstance(getContext()).play(SoundManager.CANCEL);
+                break;
+        }
+        return true;
+    }
+
+    private void handleSelectedIcon(IconView icon){
+        if(icon != null){
+            switch(icon.getReactionType()){
+                case LIKE:
+                    onLike();
+                    break;
+                case LOVE:
+                    onLove();
+                    break;
+                case LAUGH:
+                    onLaugh();
+                    break;
+                case WOW:
+                    onWow();
+                    break;
+                case SAD:
+                    onSad();
+                    break;
+                case ANGRY:
+                    onAngry();
+                    break;
+            }
+        }
+    }
+
+    public void selectReaction(Reaction reaction){
+        handleSelectedIcon(getReactionIcon(reaction));
+    }
+
+    public IconView getReactionIcon(Reaction reaction){
+        switch(reaction){
+            case LIKE:
+                return like;
+            case LOVE:
+                return love;
+            case LAUGH:
+                return laugh;
+            case WOW:
+                return wow;
+            case SAD:
+                return sad;
+            case ANGRY:
+                return angry;
+        }
+        return null;
+    }
+
+    private IconView getClosestIcon(float x, float y){
+        if(inHorizontalRange(x) && inVerticalRange(y)){
+            IconView view;
+            for(int i = 0; i < getChildCount(); i++){
+                if(getChildAt(i) instanceof IconView) {
+                    view = (IconView) getChildAt(i);
+                    if(x >= (view.getX() - xPad) && x < (view.getX() + view.getWidth() + bPad)){
+                        return view;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean inVerticalRange(float y){
+        if(y >= yStart){
+            if(y < yStart + 2 * vHeight){
+                return true;
+            }
+        }
+        Log.d(TAG, "inVerticalRange = false");
+        return false;
+    }
+
+    private boolean inHorizontalRange(float x){
+        if(x >= xStart - cornerSize){
+            if(x < xStart + vWidth - cornerSize){
+                return true;
+            }
+        }
+        Log.d(TAG, "inHorizontalRange = false");
+        return false;
+    }
+
+    public void show(MotionEvent event){
+        if(event != null){
+            sX = event.getRawX();
+            sY = event.getRawY();
+        }
+        //Make sure the view is remeasured
+        requestLayout();
+        //Make the View visible
+        setVisibility(View.VISIBLE);
+        SoundManager.getInstance(getContext()).play(SoundManager.APPEAR);
+        onInterceptTouchEvent(event);
+        onShow();
+    }
+
+    public void dismiss(){
+        sX = 0f;
+        sY = 0f;
+        setVisibility(View.GONE);
+        SoundManager.getInstance(getContext()).play(SoundManager.LEAVE);
+        onHide();
     }
 
     private void setChildToLarge(IconView child){
@@ -314,10 +505,12 @@ public class ReactionView extends ViewGroup {
         IconView.Mode mode = IconView.Mode.LARGE;
         IconView view, smallestView = null;
         for(int i = 0; i < getChildCount(); i++){
-            view = (IconView) getChildAt(i);
-            if(view.getMode().compareTo(mode) < 0){
-                mode = view.getMode();
-                smallestView = view;
+            if(getChildAt(i) instanceof IconView) {
+                view = (IconView) getChildAt(i);
+                if (view.getMode().compareTo(mode) < 0) {
+                    mode = view.getMode();
+                    smallestView = view;
+                }
             }
         }
         return smallestView;
@@ -327,13 +520,134 @@ public class ReactionView extends ViewGroup {
         IconView.Mode mode = IconView.Mode.SMALL;
         IconView view, largestView = null;
         for(int i = 0; i < getChildCount(); i++){
-            view = (IconView) getChildAt(i);
-            if(view.getMode().compareTo(mode) > 0){
-                mode = view.getMode();
-                largestView = view;
+            if(getChildAt(i) instanceof IconView) {
+                view = (IconView) getChildAt(i);
+                if (view.getMode().compareTo(mode) > 0) {
+                    mode = view.getMode();
+                    largestView = view;
+                }
             }
         }
         return largestView;
+    }
+
+    @Override
+    public void onLike() {
+        alertOnLikeSelected();
+    }
+
+    @Override
+    public void onLove() {
+        alertOnLoveSelected();
+    }
+
+    @Override
+    public void onLaugh() {
+        alertOnLaughSelected();
+    }
+
+    @Override
+    public void onWow() {
+        alertOnWowSelected();
+    }
+
+    @Override
+    public void onSad() {
+        alertOnSadSelected();
+    }
+
+    @Override
+    public void onAngry() {
+        alertOnAngrySelected();
+    }
+
+    @Override
+    public void onCancel() {
+        //This method can be overrided from subclasses, just like the other event methods, to perform custom logic
+    }
+
+    protected void onShow(){
+        alertOnShow();
+    }
+
+    protected void onHide(){
+        alertOnHide();
+    }
+
+    public void addReactionSelectedListener(ReactionSelectedListener l){
+        if(reactionListeners == null){
+            reactionListeners = new ArrayList<>();
+        }
+        reactionListeners.add(l);
+    }
+
+    public boolean removeReactionSelectedListener(ReactionSelectedListener l){
+        if(reactionListeners != null){
+            return reactionListeners.remove(l);
+        }
+        return false;
+    }
+
+    public void addVisibilityChangedListener(VisibilityChangedListener l){
+        if(visibilityListeners == null){
+            visibilityListeners = new ArrayList<>();
+        }
+        visibilityListeners.add(l);
+    }
+
+    public boolean removeVisibilityChangedListener(VisibilityChangedListener l){
+        if(visibilityListeners != null){
+            return visibilityListeners.remove(l);
+        }
+        return false;
+    }
+
+    private void alertOnLikeSelected(){
+        for(ReactionSelectedListener l : reactionListeners){
+            l.onLike();
+        }
+    }
+
+    private void alertOnLoveSelected(){
+        for(ReactionSelectedListener l : reactionListeners){
+            l.onLove();
+        }
+    }
+
+    private void alertOnLaughSelected(){
+        for(ReactionSelectedListener l : reactionListeners){
+            l.onLaugh();
+        }
+    }
+
+    private void alertOnWowSelected(){
+        for(ReactionSelectedListener l : reactionListeners){
+            l.onWow();
+        }
+    }
+
+    private void alertOnSadSelected(){
+        for(ReactionSelectedListener l : reactionListeners){
+            l.onSad();
+        }
+    }
+
+    private void alertOnAngrySelected(){
+        for(ReactionSelectedListener l : reactionListeners){
+            l.onAngry();
+        }
+    }
+
+    private void alertOnShow(){
+        for(VisibilityChangedListener l : visibilityListeners){
+            l.onShow();
+        }
+    }
+
+    private void alertOnHide(){
+        for(VisibilityChangedListener l : visibilityListeners){
+            l.onHide();
+        }
     }
 
 }

@@ -20,7 +20,7 @@ import android.view.View;
  */
 public class IconView extends View {
     private static final String TAG = IconView.class.getSimpleName();
-    private ReactionPopup.Reaction reactionType;
+    private Reaction reactionType;
     private Drawable icon;
 
     private int currentSize;
@@ -49,14 +49,14 @@ public class IconView extends View {
         init(context, null);
     }
 
-    public IconView(Context context, ReactionPopup.Reaction type){
+    public IconView(Context context, Reaction type){
         super(context);
         init(context, null);
         this.reactionType = type;
         handleImage(context);
     }
 
-    public IconView(Context context, ReactionPopup.Reaction type, Drawable icon){
+    public IconView(Context context, Reaction type, Drawable icon){
         super(context);
         init(context, null);
         this.reactionType = type;
@@ -81,7 +81,7 @@ public class IconView extends View {
 
     private void init(Context context, AttributeSet attrs){
         mode = Mode.MEDIUM;
-        reactionType = ReactionPopup.Reaction.LIKE;
+        reactionType = Reaction.LIKE;
         showText = false;
         showTextWhenLarge = false;
         textSize = 0;
@@ -101,22 +101,22 @@ public class IconView extends View {
             switch(r){
                 default:
                 case 0:
-                    reactionType = ReactionPopup.Reaction.LIKE;
+                    reactionType = Reaction.LIKE;
                     break;
                 case 1:
-                    reactionType = ReactionPopup.Reaction.LOVE;
+                    reactionType = Reaction.LOVE;
                     break;
                 case 2:
-                    reactionType = ReactionPopup.Reaction.LAUGH;
+                    reactionType = Reaction.LAUGH;
                     break;
                 case 3:
-                    reactionType = ReactionPopup.Reaction.WOW;
+                    reactionType = Reaction.WOW;
                     break;
                 case 4:
-                    reactionType = ReactionPopup.Reaction.SAD;
+                    reactionType = Reaction.SAD;
                     break;
                 case 5:
-                    reactionType = ReactionPopup.Reaction.ANGRY;
+                    reactionType = Reaction.ANGRY;
                     break;
             }
         }
@@ -220,11 +220,11 @@ public class IconView extends View {
         }
     }
 
-    public ReactionPopup.Reaction getReactionType(){
+    public Reaction getReactionType(){
         return reactionType;
     }
 
-    public void setReactionType(ReactionPopup.Reaction reactionType){
+    public void setReactionType(Reaction reactionType){
         this.reactionType = reactionType;
         handleImage(getContext());
     }

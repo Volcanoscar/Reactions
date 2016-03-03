@@ -1,7 +1,9 @@
 package com.chrynan.reactions;
 
 import android.content.Context;
+import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.ViewGroup;
 import android.widget.PopupWindow;
 
 import java.util.ArrayList;
@@ -12,18 +14,10 @@ import java.util.List;
  */
 public class ReactionPopup extends PopupWindow {
     private boolean showing;
-    private boolean reactionSelected;
     private Reaction reaction;
     private Context context;
 
-    private List<ReactionSelectedListener> listeners;
-    private List<VisibilityChangedListener> visibilityListeners;
-
     private ReactionView view;
-
-    public enum Reaction{
-        LIKE, LOVE, LAUGH, WOW, SAD, ANGRY
-    }
 
     public ReactionPopup(Context context){
         super(context);
@@ -33,44 +27,34 @@ public class ReactionPopup extends PopupWindow {
 
     private void init(Context context){
         showing = false;
-        reactionSelected = false;
         reaction = null;
-        listeners = new ArrayList<>();
-        visibilityListeners = new ArrayList<>();
         view = new ReactionView(context);
-        //TODO
-    }
-
-    protected void onLike(){
-
-    }
-
-    protected void onLove(){
-
-    }
-
-    protected void onLaugh(){
-
-    }
-
-    protected void onWow(){
-
-    }
-
-    protected void onSad(){
-
-    }
-
-    protected void onAngry(){
-
-    }
-
-    protected void onShow(){
-
-    }
-
-    protected void onHide(){
-
+        view.addReactionSelectedListener(new ReactionSelectedListener() {
+            @Override
+            public void onLike() {
+                reaction = Reaction.LIKE;
+            }
+            @Override
+            public void onLove() {
+                reaction = Reaction.LOVE;
+            }
+            @Override
+            public void onLaugh() {
+                reaction = Reaction.LAUGH;
+            }
+            @Override
+            public void onWow() {
+                reaction = Reaction.WOW;
+            }
+            @Override
+            public void onSad() {
+                reaction = Reaction.SAD;
+            }
+            @Override
+            public void onAngry() {
+                reaction = Reaction.ANGRY;
+            }
+        });
     }
 
     public boolean isShowing() {
@@ -78,159 +62,52 @@ public class ReactionPopup extends PopupWindow {
     }
 
     public void show(MotionEvent event){
-        //TODO
-        onShow();
-        alertOnShow();
+        if(!showing){
+            showAtLocation(view, Gravity.NO_GRAVITY, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        }
+        showing = true;
+        view.show(event);
     }
 
+    @Override
     public void dismiss(){
-        //TODO
-        onHide();
-        alertOnHide();
+        view.dismiss();
+        if(showing){
+            super.dismiss();
+        }
+        showing = false;
     }
 
     public void selectReaction(Reaction reaction){
-        handleReactionSelected(reaction);
+        view.selectReaction(reaction);
     }
 
     public Reaction getSelectedReaction(){
         return reaction;
     }
 
-    public boolean isReactionSelected(){
-        return reactionSelected;
-    }
-
-    private void handleReactionSelected(Reaction reaction){
-        this.reaction = reaction;
-        reactionSelected = true;
-        if(showing){
-            dismiss();
-            showing = false;
-        }
-        switch(reaction){
-            case LIKE:
-                onLike();
-                alertOnLikeSelected();
-                break;
-            case LOVE:
-                onLove();
-                alertOnLoveSelected();
-                break;
-            case LAUGH:
-                onLaugh();
-                alertOnLaughSelected();
-                break;
-            case WOW:
-                onWow();
-                alertOnWowSelected();
-                break;
-            case SAD:
-                onSad();
-                alertOnSadSelected();
-                break;
-            case ANGRY:
-                onAngry();
-                alertOnAngrySelected();
-                break;
-        }
-    }
-
     public Context getContext(){
         return context;
     }
 
-
-    public interface ReactionSelectedListener{
-        void onLike();
-        void onLove();
-        void onLaugh();
-        void onWow();
-        void onSad();
-        void onAngry();
+    public ReactionView getReactionView(){
+        return view;
     }
 
     public void addReactionSelectedListener(ReactionSelectedListener l){
-        if(listeners == null){
-            listeners = new ArrayList<>();
-        }
-        listeners.add(l);
+        view.addReactionSelectedListener(l);
     }
 
     public boolean removeReactionSelectedListener(ReactionSelectedListener l){
-        if(listeners != null){
-            return listeners.remove(l);
-        }
-        return false;
-    }
-
-    private void alertOnLikeSelected(){
-        for(ReactionSelectedListener l : listeners){
-            l.onLike();
-        }
-    }
-
-    private void alertOnLoveSelected(){
-        for(ReactionSelectedListener l : listeners){
-            l.onLove();
-        }
-    }
-
-    private void alertOnLaughSelected(){
-        for(ReactionSelectedListener l : listeners){
-            l.onLaugh();
-        }
-    }
-
-    private void alertOnWowSelected(){
-        for(ReactionSelectedListener l : listeners){
-            l.onWow();
-        }
-    }
-
-    private void alertOnSadSelected(){
-        for(ReactionSelectedListener l : listeners){
-            l.onSad();
-        }
-    }
-
-    private void alertOnAngrySelected(){
-        for(ReactionSelectedListener l : listeners){
-            l.onAngry();
-        }
-    }
-
-
-    public interface VisibilityChangedListener{
-        void onShow();
-        void onHide();
+        return view.removeReactionSelectedListener(l);
     }
 
     public void addVisibilityChangedListener(VisibilityChangedListener l){
-        if(visibilityListeners == null){
-            visibilityListeners = new ArrayList<>();
-        }
-        visibilityListeners.add(l);
+        view.addVisibilityChangedListener(l);
     }
 
     public boolean removeVisibilityChangedListener(VisibilityChangedListener l){
-        if(visibilityListeners != null){
-            return visibilityListeners.remove(l);
-        }
-        return false;
+        return view.removeVisibilityChangedListener(l);
     }
-
-    private void alertOnShow(){
-        for(VisibilityChangedListener l : visibilityListeners){
-            l.onShow();
-        }
-    }
-
-    private void alertOnHide(){
-        for(VisibilityChangedListener l : visibilityListeners){
-            l.onHide();
-        }
-    }
-
 
 }
