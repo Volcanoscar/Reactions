@@ -92,7 +92,8 @@ public class ReactionView extends ViewGroup implements ReactionEvents {
 
     private void init(Context context, AttributeSet attrs){
         //Initially the View is not visible until it is alerted to show at a specific position, sX and sY
-        //setVisibility(View.GONE);
+        setVisibility(View.GONE);
+        setLayoutTransition(new ReactionLayoutTransition());
         visibilityListeners = new ArrayList<>();
         reactionListeners = new ArrayList<>();
         vc = ViewConfiguration.get(context);
